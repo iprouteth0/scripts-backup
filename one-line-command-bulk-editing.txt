@@ -1,0 +1,1 @@
+grep -rl LOCAL_COPY_HEADERS hardware/qcom-caf/* | xargs sed -i 's|LOCAL_COPY_HEADERS|LOCAL_EXPORT_C_INCLUDE_DIRS|g'

@@ -1,0 +1,8 @@
+export BUILD_BROKEN_DUP_RULES=true
+     for duplicate make file entries
+SELINUX_IGNORE_NEVERALLOWS=true
+     sepokicy neverallows errors
+export SKIP_ABI_CHECKS=true
+     ABI incompatability errors
+WITHOUT_CHECK_API=true
+     API level errors

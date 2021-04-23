@@ -1,0 +1,7 @@
+vendor/gapps/product/blobs/etc/permissions/Android.bp
+ commented out google dialer support
+
+device/motorola/ginna/
+lineage.dependencies to havoc.dependencies
+lineage_ginna.mk to havoc_ginna.mk
+AndroidProducts.mk for havoc_ginna

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<manifest>
+
+<project path="device/motorola/ginna" name="motoe7/android_device_motorola_ginna" remote="github"
+
+revision="lineage-18.1" />
+
+<project path="vendor/motorola/ginna" name="motoe7/android_vendor_motorola_ginna"
+
+remote="github" revision="lineage-18.1" />
+
+<project path="kernel/motorola/sdm632" name="motoe7/android_kernel_motorola_sdm632"
+
+remote="github" revision="lineage-18.1" />
+
+</manifest>

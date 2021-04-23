@@ -1,0 +1,6 @@
+11 fixes system
+remove and replaced hardware/qcom-caf from sakura
+
+may reqire vendor/qcom from sakura
+
+also an extra expirted build variable to bypass selinux errors

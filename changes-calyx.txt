@@ -1,0 +1,2 @@
+hardware/qcom/gps/core/Android.mk
+vendor/qcom/opensource/cryptfs_hw/Android.bp

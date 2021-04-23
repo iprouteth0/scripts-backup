@@ -1,0 +1,209 @@
+#!/bin/bash
+# Build crDroid and optionally upload to remote FTP server 
+# Author: Gwolf2u (gwolfu@xda)
+script_version=6.0.6
+# Specify colors utilized in the terminal
+red=$(tput setaf 1) # red grn=$(tput setaf 2) # green ylw=$(tput 
+setaf 3) # yellow blu=$(tput setaf 4) # blue cya=$(tput 
+rev)$(tput bold)$(tput setaf 6) # bold cyan reversed ylr=$(tput 
+rev)$(tput bold)$(tput setaf 3) # bold yellow reversed 
+grr=$(tput rev)$(tput bold)$(tput setaf 2) # bold green reversed 
+rer=$(tput rev)$(tput bold)$(tput setaf 1) # bold red reversed 
+txtrst=$(tput sgr0) # Reset
+#detect path where the script is running
+script_path="`dirname \"$0\"`" script_path="`( cd 
+\"$script_path\" && pwd )`" if [ -z "$script_path" ] ; then
+    # error; for some reason, the path is not accessible
+    echo "${red}Can not read run path" echo "Build can not 
+    continue"${txtrst} exit 1 # fail
+fi arg=$1 case $arg in "add" ) echo "Add a new device:" echo 
+        "Format: <device codename>,<remote upload path>" read 
+        newdevice echo $newdevice >> devices.conf echo "Added" 
+        exit 0 ;;
+    "remove" ) if [ ! -f devices.conf ]; then echo "There are no 
+            devices saved" exit 0
+        fi echo "Enter line number to delete" awk '$0!=""{print 
+        NR, $0}' devices.conf read delline sed -i $delline'd' 
+        devices.conf echo "Deleted" exit 0 ;;
+    "list" ) if [ ! -f devices.conf ]; then echo "There are no 
+            devices saved" exit 0
+        fi echo "Listing all devices:" cat 
+        $script_path"/devices.conf" exit 0 ;;
+    "clean" ) echo "Cleaned up configuration" rm -f 
+        $script_path"/config.conf" exit 0 ;;
+    "clear" ) echo "Cleaned up all devices" rm -f 
+        $script_path"/devices.conf" exit 0 ;;
+    "help" ) echo "This build script is used to be able to build 
+        crDroid and upload the builds to remote server" echo 
+        "Usage: ./build [OPTION]" echo "" echo "Commands 
+        supported:" echo "add - adds a device to be built" echo 
+        "remove - removes a device from build list" echo "list - 
+        lists all devices that are configured to be built" echo 
+        "clean - cleans up the configuration" echo "clear - 
+        clears up all the devices on build list" exit 0 ;;
+esac echo "===========================================" echo 
+"${cya}Initiate build script - v$script_version for crDroid 
+6.x"${txtrst} echo "==========================================="
+#check script updates
+echo "Running update check..." wget -O check -q 
+https://raw.githubusercontent.com/crdroidandroid/crdroid_build/10.0/build 
+linenr=$(grep -n "script_version" check | grep -Eo '^[^:]+') 
+array=( $linenr ) online_version=$(sed -n ${array[0]}'p' < check 
+| cut -d "=" -f 2 | sed -r 's/[.]+//g')
+rm -f check script_version=$(echo $script_version | sed -r 
+'s/[.]+//g') if [ "$online_version" -gt "$script_version" ]; 
+then
+    echo "${ylr}A new version of this build script is available 
+    on GitHub" echo "Run below command to update before 
+    re-attempting to run again" echo "${rer}curl -LJO 
+    https://raw.githubusercontent.com/crdroidandroid/crdroid_build/10.0/build${txtrst}" 
+    read -p "${ylr}Press enter to exit${txtrst}" exit 0
+else echo "${grr}Seems you are running latest build script 
+    version available ㋡${txtrst}"
+fi config=$script_path"/config.conf" if [ ! -f $config ]; then 
+    echo "Configuration file is missing" echo "Creating..." echo 
+    "Please enter the path where crDroid folder is located (full 
+    path ex:/home/<user>/crDroid)" read set_crDroid_path echo 
+    "Upload compilation to remote server at end of build?" 
+    set_upload_build=false select yn in "Yes" "No"; do
+        case $yn in Yes ) set_upload_build=true; break;; No ) 
+            set_upload_build=false;break;;
+        esac done if [ "$set_upload_build" = true ] ; then echo 
+        "Enter remote hostname (ex: upme.crdroid.net): " read 
+        set_remote_hostname echo "Enter remote username:" read 
+        set_remote_username echo "Enter remote password:" read 
+        set_remote_password
+    fi
+    #create config file
+	echo "config_version=3" >> $config echo 
+    "crDroid_path="$set_crDroid_path >> $config echo 
+    "upload_build="$set_upload_build >> $config echo 
+    "remote_hostname="$set_remote_hostname >> $config echo 
+    "remote_username="$set_remote_username >> $config echo 
+    "remote_password="$set_remote_password >> $config echo 
+    "${grn}Successfully created configuration file at 
+    ${ylw}$script_path/config.conf${txtrst}" echo "Please run 
+    \"${grn}./build add${txtrst}\" to add new devices for build 
+    script" echo "For a list of availble commands, run 
+    \"${grn}./build help${txtrst}\"" exit 0
+fi
+#read configuration
+source config.conf if [[ -z ${config_version+x} ]] || (( 
+"$config_version" < "3" )); then
+	echo "${red}Configuration file is outdated. Please run 
+	${ylw}./build clean ${red}followed by ${ylw}./build 
+	${red}to regenerate it" exit 1
+fi devices=$script_path"/devices.conf" if [ ! -f $devices ]; 
+then
+    echo "${red}There are no devices configured to be built" 
+    echo "Run \"./build add\" to add a new device"${txtrst} exit 
+    1 # fail
+fi
+#check if already synced
+crdroid_synced=$crDroid_path/vendor/lineage/config/common.mk if 
+[ ! -f $crdroid_synced ]; then
+    echo "${ylw}Detected missing first sync... atempting first 
+    time sync..."${txtrst} cd $crDroid_path repo sync 
+    --force-sync --no-clone-bundle
+fi if [ ! -f $crdroid_synced ]; then read -p "${red}Something 
+    went wrong :( - Maybe misconfigured script!?" exit
+fi PATH=~/bin:$PATH export LC_ALL=C export USE_CCACHE=true 
+export SKIP_ABI_CHECKS=true function repopicking() {
+    #create a repopick.txt file and run after repo sync
+    picks=$script_path/repopick.txt if [ -f $picks ]; then . 
+        build/envsetup.sh cat $picks | while read line do
+            $line done fi
+}
+cd $crDroid_path echo "${blu}Run sync?${txtrst}" select yn in 
+"Yes" "No"; do
+    case $yn in Yes ) repo sync --force-sync --no-clone-bundle; 
+        repopicking; break;; No ) break;;
+    esac done echo "${blu}For how many days you want changelog 
+to be generated?${txtrst}" read days until [[ $days =~ 
+^-?[0-9]+$ ]]; do
+    echo "Invalid input - only numbers are allowed" read days 
+done export changelog_days=$days echo "${grn}Roger... $days days 
+will be set for changelog generation${txtrst}" echo "${blu}Make 
+clean build?${txtrst}" select yn in "Yes" "No"; do
+    case $yn in Yes ) . build/envsetup.sh && make clean; break;; 
+        No ) break;;
+    esac done
+#detect android version based on common.mk
+major_check=$(grep -n "PRODUCT_VERSION_MAJOR" 
+$crDroid_path/vendor/lineage/config/common.mk | grep -Eo 
+'^[^:]+') array=( $major_check ) android_major=$(sed -n 
+${array[0]}'p' < $crDroid_path/vendor/lineage/config/common.mk | 
+cut -d "=" -f 2 | sed -r 's/[.]+//g' | tr -d '[:space:]') 
+minor_check=$(grep -n "PRODUCT_VERSION_MINOR" 
+$crDroid_path/vendor/lineage/config/common.mk | grep -Eo 
+'^[^:]+') array=( $minor_check ) android_minor=$(sed -n 
+${array[0]}'p' < $crDroid_path/vendor/lineage/config/common.mk | 
+cut -d "=" -f 2 | sed -r 's/[.]+//g' | tr -d '[:space:]') 
+android=$android_major"."$android_minor cr_check=$(grep -n 
+"CR_VERSION" $crDroid_path/vendor/lineage/config/common.mk | 
+grep -Eo '^[^:]+') array=( $cr_check ) crDroid=$(sed -n 
+${array[0]}'p' < $crDroid_path/vendor/lineage/config/common.mk | 
+cut -d "=" -f 2 | tr -d '[:space:]') INFO=() echo 
+"===========================================" echo 
+"${ylr}Setting build environment"${txtrst} echo 
+"-------------------------------------------" echo "Script path 
+set to: "${grn}$script_path${txtrst} echo "crDroid path set to: 
+"${grn}$crDroid_path${txtrst} echo "Upload complete build to 
+remote server?: "${grn}$upload_build${txtrst} echo "Trying to 
+compile crDroid "${grn}$crDroid${txtrst}" based on Android 
+"${grn}$android${txtrst} echo 
+"===========================================" echo "" echo 
+"${ylw}Initiate build for all devices...${txtrst}" file=$devices 
+while IFS= read -r line do
+    IFS=', ' read -r -a device_uploadpath <<< "$line"
+    #set device name
+    device=${device_uploadpath[0]} if [[ $device == *"#"* ]]; 
+    then
+        device="${device//#}" echo "${red}Found comment (#): 
+        Skipping build for ${ylw}$device ${red}${txtrst}" 
+        INFO+=('1 '$device' (Reason: instruction to skip found 
+        in devices)')
+    else echo "${grn}Now building "${ylw}$device${txtrst}
+    
+        #set BuildID - aka name of the zip file from OUT folder 
+        #at the end of the build
+        BuildID="crDroidAndroid-"$android"-"$(date -d "$D" 
+        '+%Y')$(date -d "$D" '+%m')$(date -d "$D" 
+        '+%d')"-"$device"-v"$crDroid".zip"
+    
+        #initiate build script and start actual build
+        . build/envsetup.sh brunch $device
+        
+        #define upload file path
+        uploadfile=$crDroid_path/out/target/product/$device/$BuildID 
+        echo "Checking build result status..." if [ -e 
+        "$uploadfile" ]; then
+            echo "${grn}Seems compilation is ready for 
+            $device${txtrst}" if [ "$upload_build" = true ] ; 
+            then
+                echo "${grn}Uploading new $device build to 
+                $remote_hostname${txtrst}" curl --ssl -k -T 
+                $uploadfile 
+                ftp://$remote_hostname/${device_uploadpath[1]}/ 
+                --user $remote_username:$remote_password 
+                INFO+=('2 '$device)
+            else INFO+=('3 '$device) fi else echo "${red}Device 
+			"$device "did not produce a proper 
+			build${txtrst}" INFO+=('0 '$device' 
+			(Reason: unknown - better run a new 
+			build manually)')
+        fi fi done < "$file" echo ${grr}"Script finished with 
+following results"${txtrst} for i in "${INFO[@]}" do
+	#echo $i
+    if [[ $i == *"0"* ]]; then codename=${i//0} echo 
+        "${red}Compilation error for device" $codename${txtrst}
+    elif [[ $i == *"1"* ]]; then codename=${i//1} echo 
+        "${ylw}Warning for device" $codename${txtrst}
+    elif [[ $i == *"2"* ]]; then codename=${i//2} echo 
+        "${grn}Device" $codename "compiled and uploaded 
+        successfully ㋡${txtrst}"
+    else codename=${i//3} echo "${grn}Device" $codename 
+        "compiled successfully ㋡ (consider uploading 
+        build?)${txtrst}"
+    fi done
+read -p "Press enter to exit"

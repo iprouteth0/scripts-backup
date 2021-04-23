@@ -1,0 +1,13 @@
+hardware/qcom/gpc/etc/Android.mk
+hardware/qcom/gps/core/Android.mk
+hardware/qcom/gpd/utils/Android.mk 
+ are declared already in device tree
+
+hardware/qcom/gps/loc_api/libloc_api_50001/Android.mk
+ only vendor using local vdnk may use local copy headers
+
+hardware/qcom/gps/loc_api/Android.mk
+ above file missing warning
+
+gapps added to device/motorola/ginna/lineage_ginna.mk
+
