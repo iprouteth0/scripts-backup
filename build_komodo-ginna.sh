@@ -29,7 +29,7 @@ then
 export KOMODO_GAPPS_TYPE=gapps
 elif [[ $komodo_gapps == 2 ]]
 then
-export KOMODO_GAPPS_TUPE=microg
+export KOMODO_GAPPS_TYPE=microg
 fi
 
 if [[ ! -f "$SOURCEFILE" ]]
